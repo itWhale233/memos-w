@@ -162,7 +162,8 @@ func (s *Service) handleReply(ctx context.Context, cfg Config, memo *v1pb.Memo, 
 	_, err = s.creator.CreateMemoComment(botCtx, &v1pb.CreateMemoCommentRequest{
 		Name: parent,
 		Comment: &v1pb.Memo{
-			Content: reply,
+			Content:    reply,
+			Visibility: memo.GetVisibility(),
 		},
 	})
 	return err

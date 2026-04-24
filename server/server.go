@@ -22,7 +22,6 @@ import (
 	"github.com/usememos/memos/server/router/frontend"
 	mcprouter "github.com/usememos/memos/server/router/mcp"
 	"github.com/usememos/memos/server/router/rss"
-	botaibot "github.com/usememos/memos/server/runner/aibot"
 	"github.com/usememos/memos/server/runner/s3presign"
 	"github.com/usememos/memos/store"
 )

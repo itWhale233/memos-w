@@ -16,6 +16,7 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	"github.com/usememos/memos/internal/aibot"
 	"github.com/usememos/memos/internal/idp"
 	"github.com/usememos/memos/internal/idp/oauth2"
 	"github.com/usememos/memos/internal/util"
@@ -582,6 +583,16 @@ func (*APIV1Service) buildRefreshTokenCookie(ctx context.Context, refreshToken s
 }
 
 func (s *APIV1Service) fetchCurrentUser(ctx context.Context) (*store.User, error) {
+	if botUserID := aibot.BotUserIDFromContext(ctx); botUserID != 0 {
+		user, err := s.Store.GetUser(ctx, &store.FindUser{ID: &botUserID})
+		if err != nil {
+			return nil, err
+		}
+		if user == nil {
+			return nil, errors.Errorf("bot user %d not found", botUserID)
+		}
+		return user, nil
+	}
 	userID := auth.GetUserID(ctx)
 	if userID == 0 {
 		return nil, nil

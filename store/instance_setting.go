@@ -238,6 +238,7 @@ func (s *Store) GetInstanceAISetting(ctx context.Context) (*storepb.InstanceAISe
 	return instanceAISetting, nil
 }
 
+
 const (
 	defaultInstanceStorageType       = storepb.InstanceStorageSetting_LOCAL
 	defaultInstanceUploadSizeLimitMb = 30

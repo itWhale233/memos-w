@@ -10,10 +10,12 @@ import (
 	"github.com/labstack/echo/v5/middleware"
 	"golang.org/x/sync/semaphore"
 
+	"github.com/usememos/memos/internal/aibot"
 	"github.com/usememos/memos/internal/markdown"
 	"github.com/usememos/memos/internal/profile"
 	v1pb "github.com/usememos/memos/proto/gen/api/v1"
 	"github.com/usememos/memos/server/auth"
+	botaibot "github.com/usememos/memos/server/runner/aibot"
 	"github.com/usememos/memos/store"
 )
 
@@ -34,6 +36,9 @@ type APIV1Service struct {
 	Store           *store.Store
 	MarkdownService markdown.Service
 	SSEHub          *SSEHub
+	BotConfigStore  *aibot.ConfigStore
+	BotService      *aibot.Service
+	BotRunner       *botaibot.Runner
 
 	// thumbnailSemaphore limits concurrent thumbnail generation to prevent memory exhaustion
 	thumbnailSemaphore       *semaphore.Weighted
@@ -51,6 +56,7 @@ func NewAPIV1Service(secret string, profile *profile.Profile, store *store.Store
 		Store:                    store,
 		MarkdownService:          markdownService,
 		SSEHub:                   NewSSEHub(),
+		BotConfigStore:           aibot.NewConfigStore(profile, store),
 		thumbnailSemaphore:       semaphore.NewWeighted(3), // Limit to 3 concurrent thumbnail generations
 		imageProcessingSemaphore: semaphore.NewWeighted(2),
 	}
@@ -128,6 +134,14 @@ func (s *APIV1Service) RegisterGateway(ctx context.Context, echoServer *echo.Ech
 
 	gwGroup.Any("/api/v1/*", handler)
 	gwGroup.Any("/file/*", handler)
+	apiAuthenticator := auth.NewAuthenticator(s.Store, s.Secret)
+	if s.BotService == nil {
+		s.BotService = aibot.NewService(s.Store, s.BotConfigStore, botCommentCreator{api: s})
+	}
+	if s.BotRunner == nil {
+		s.BotRunner = botaibot.NewRunner(s.BotService)
+	}
+	RegisterAIAssistantRoutes(gwGroup, s.BotConfigStore, apiAuthenticator)
 
 	// Connect handlers for browser clients (replaces grpc-web).
 	logStacktraces := s.Profile.Demo
@@ -154,4 +168,20 @@ func (s *APIV1Service) RegisterGateway(ctx context.Context, echoServer *echo.Ech
 	connectGroup.Any("/memos.api.v1.*", echo.WrapHandler(http.MaxBytesHandler(connectMux, maxAPIRequestBytes)))
 
 	return nil
+}
+
+type botCommentCreator struct {
+	api *APIV1Service
+}
+
+func (c botCommentCreator) CreateMemoComment(ctx context.Context, request *v1pb.CreateMemoCommentRequest) (*v1pb.Memo, error) {
+	return c.api.CreateMemoComment(ctx, request)
+}
+
+func (c botCommentCreator) ListMemoComments(ctx context.Context, request *v1pb.ListMemoCommentsRequest) (*v1pb.ListMemoCommentsResponse, error) {
+	return c.api.ListMemoComments(ctx, request)
+}
+
+func (c botCommentCreator) ValidateFilter(ctx context.Context, filter string) error {
+	return c.api.validateFilter(ctx, filter)
 }

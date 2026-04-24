@@ -470,6 +470,7 @@ func convertInstanceAISettingToStore(setting *v1pb.InstanceSetting_AISetting) *s
 	return aiSetting
 }
 
+
 func validateInstanceSetting(setting *v1pb.InstanceSetting) error {
 	key, err := ExtractInstanceSettingKeyFromName(setting.Name)
 	if err != nil {
@@ -480,6 +481,7 @@ func validateInstanceSetting(setting *v1pb.InstanceSetting) error {
 	}
 	return validateInstanceTagsSetting(setting.GetTagsSetting())
 }
+
 
 func (s *APIV1Service) prepareInstanceAISettingForUpdate(ctx context.Context, setting *storepb.InstanceAISetting) error {
 	if setting == nil {

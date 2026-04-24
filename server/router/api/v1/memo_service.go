@@ -163,6 +163,9 @@ func (s *APIV1Service) CreateMemo(ctx context.Context, request *v1pb.CreateMemoR
 	if !isMentionNotificationSuppressed(ctx) {
 		s.dispatchMemoMentionNotificationsBestEffort(ctx, memo, nil, "")
 	}
+	if !isSSESuppressed(ctx) && s.BotRunner != nil {
+		s.BotRunner.Enqueue("memo.create", memoMessage)
+	}
 
 	return memoMessage, nil
 }
@@ -522,6 +525,9 @@ func (s *APIV1Service) UpdateMemo(ctx context.Context, request *v1pb.UpdateMemoR
 		s.dispatchMemoMentionNotificationsBestEffort(ctx, memo, parentMemo, previousContent)
 	}
 	s.dispatchMemoUpdatedSideEffects(ctx, memo, parentMemo, memoMessage)
+	if s.BotRunner != nil {
+		s.BotRunner.Enqueue("memo.update", memoMessage)
+	}
 
 	return memoMessage, nil
 }
@@ -695,6 +701,9 @@ func (s *APIV1Service) CreateMemoComment(ctx context.Context, request *v1pb.Crea
 		Visibility: relatedMemo.Visibility,
 		CreatorID:  relatedMemo.CreatorID,
 	})
+	if s.BotRunner != nil {
+		s.BotRunner.Enqueue("memo.comment.create", memoComment)
+	}
 
 	return memoComment, nil
 }

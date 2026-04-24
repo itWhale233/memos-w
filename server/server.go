@@ -22,6 +22,7 @@ import (
 	"github.com/usememos/memos/server/router/frontend"
 	mcprouter "github.com/usememos/memos/server/router/mcp"
 	"github.com/usememos/memos/server/router/rss"
+	botaibot "github.com/usememos/memos/server/runner/aibot"
 	"github.com/usememos/memos/server/runner/s3presign"
 	"github.com/usememos/memos/store"
 )
@@ -36,6 +37,7 @@ type Server struct {
 	echoServer *echo.Echo
 	httpServer *http.Server
 	sseHub     *apiv1.SSEHub
+	apiV1      *apiv1.APIV1Service
 
 	backgroundRunnerCancels []context.CancelFunc
 	backgroundRunnerWG      sync.WaitGroup
@@ -73,6 +75,7 @@ func NewServer(ctx context.Context, profile *profile.Profile, store *store.Store
 	rootGroup := echoServer.Group("")
 
 	apiV1Service := apiv1.NewAPIV1Service(s.Secret, profile, store)
+	s.apiV1 = apiV1Service
 	s.sseHub = apiV1Service.SSEHub
 
 	// Register HTTP file server routes BEFORE gRPC-Gateway to ensure proper range request handling for Safari.
@@ -166,6 +169,17 @@ func (s *Server) startBackgroundRunners(ctx context.Context) {
 		s3presignRunner.Run(s3Context)
 		slog.Info("s3presign runner stopped")
 	}()
+
+	if s.apiV1 != nil && s.apiV1.BotRunner != nil {
+		botContext, botCancel := context.WithCancel(ctx)
+		s.backgroundRunnerCancels = append(s.backgroundRunnerCancels, botCancel)
+		s.backgroundRunnerWG.Add(1)
+		go func() {
+			defer s.backgroundRunnerWG.Done()
+			s.apiV1.BotRunner.Run(botContext)
+			slog.Info("aibot runner stopped")
+		}()
+	}
 
 	slog.Info("background runners started")
 }

@@ -24,6 +24,7 @@ import { useTranslate } from "@/utils/i18n";
 import SettingGroup from "./SettingGroup";
 import SettingSection from "./SettingSection";
 import SettingTable from "./SettingTable";
+import AIAssistantSection from "./AIAssistantSection";
 
 type LocalAIProvider = {
   id: string;
@@ -251,6 +252,8 @@ const AISection = () => {
           {t("common.save")}
         </Button>
       </div>
+
+      <AIAssistantSection />
 
       <AIProviderDialog
         provider={editingProvider}

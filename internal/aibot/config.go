@@ -169,6 +169,12 @@ func (s *ConfigStore) validate(ctx context.Context, cfg *Config) error {
 	if cfg.ProviderID == "" {
 		return errors.New("provider_id is required when enabled")
 	}
+	if strings.TrimSpace(cfg.ReplyModel) == "" {
+		return errors.New("reply_model is required when enabled")
+	}
+	if strings.TrimSpace(cfg.ClassifyModel) == "" {
+		cfg.ClassifyModel = cfg.ReplyModel
+	}
 	user, err := resolveBotUser(ctx, s.store, cfg.BotUser)
 	if err != nil {
 		return err
@@ -236,11 +242,7 @@ func maskSecret(secret string) string {
 }
 
 func resolveBotUser(ctx context.Context, stores *store.Store, name string) (*store.User, error) {
-	const prefix = "users/"
-	if !strings.HasPrefix(name, prefix) {
-		return nil, errors.New("bot_user must use resource name format users/{user}")
-	}
-	username := strings.TrimSpace(strings.TrimPrefix(name, prefix))
+	username := strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(name), "users/"))
 	if username == "" {
 		return nil, errors.New("bot_user username is required")
 	}

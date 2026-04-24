@@ -209,6 +209,8 @@ func (s *Service) generateReply(ctx context.Context, cfg Config, memo *v1pb.Memo
 	}
 	// TODO: replace this heuristic generator with a chat/completion implementation when provider support is added.
 	_ = provider
+	_ = strings.TrimSpace(cfg.ReplyModel)
+	_ = strings.TrimSpace(cfg.ClassifyModel)
 	var recent []string
 	for _, item := range contextMemos {
 		if item == nil || strings.TrimSpace(item.GetContent()) == "" {

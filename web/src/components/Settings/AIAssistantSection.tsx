@@ -140,20 +140,24 @@ const AIAssistantSection = () => {
   };
 
   return (
-    <SettingSection title="AI Assistant">
-      <SettingGroup title="Assistant" description="Configure the internal AI automation bot.">
-        <SettingRow label="Enabled">
+      <SettingSection title={t("setting.ai-assistant.label") as string}>
+        <SettingGroup title={t("setting.ai-assistant.section-title") as string} description={t("setting.ai-assistant.description") as string}>
+        <SettingRow label={t("setting.ai-assistant.enabled") as string}>
           <Switch checked={config.enabled} onCheckedChange={(checked) => updateConfig({ enabled: checked })} />
         </SettingRow>
 
-        <SettingRow label="Bot user" vertical>
-          <Input value={config.bot_user} placeholder="users/ai-assistant" onChange={(e) => updateConfig({ bot_user: e.target.value })} />
+        <SettingRow label={t("setting.ai-assistant.bot-user") as string} vertical>
+          <Input
+            value={config.bot_user}
+            placeholder={t("setting.ai-assistant.bot-user-placeholder") as string}
+            onChange={(e) => updateConfig({ bot_user: e.target.value })}
+          />
         </SettingRow>
 
-        <SettingRow label="Provider">
+        <SettingRow label={t("setting.ai-assistant.provider") as string}>
           <Select value={config.provider_id} onValueChange={(value) => updateConfig({ provider_id: value })}>
             <SelectTrigger className="min-w-[220px]">
-              <SelectValue placeholder="Select provider" />
+              <SelectValue placeholder={t("setting.ai-assistant.select-provider") as string} />
             </SelectTrigger>
             <SelectContent>
               {providerOptions.map((provider) => (
@@ -165,7 +169,15 @@ const AIAssistantSection = () => {
           </Select>
         </SettingRow>
 
-        <SettingRow label="Trigger filter" vertical>
+        <SettingRow label={t("setting.ai-assistant.reply-model") as string} vertical>
+          <Input value={config.reply_model} placeholder="gpt-4o-mini" onChange={(e) => updateConfig({ reply_model: e.target.value })} />
+        </SettingRow>
+
+        <SettingRow label={t("setting.ai-assistant.classify-model") as string} vertical>
+          <Input value={config.classify_model} placeholder="gpt-4o-mini" onChange={(e) => updateConfig({ classify_model: e.target.value })} />
+        </SettingRow>
+
+        <SettingRow label={t("setting.ai-assistant.trigger-filter") as string} vertical>
           <Textarea
             rows={3}
             className="font-mono"
@@ -175,15 +187,15 @@ const AIAssistantSection = () => {
           />
         </SettingRow>
 
-        <SettingRow label="Persona prompt" vertical>
+        <SettingRow label={t("setting.ai-assistant.persona-prompt") as string} vertical>
           <Textarea rows={4} value={config.persona_prompt} onChange={(e) => updateConfig({ persona_prompt: e.target.value })} />
         </SettingRow>
 
-        <SettingRow label="System prompt" vertical>
+        <SettingRow label={t("setting.ai-assistant.system-prompt") as string} vertical>
           <Textarea rows={4} value={config.system_prompt} onChange={(e) => updateConfig({ system_prompt: e.target.value })} />
         </SettingRow>
 
-        <SettingRow label="Max context comments">
+        <SettingRow label={t("setting.ai-assistant.max-context-comments") as string}>
           <Input
             type="number"
             className="w-28"
@@ -193,19 +205,19 @@ const AIAssistantSection = () => {
         </SettingRow>
       </SettingGroup>
 
-      <SettingGroup title="Triggers" showSeparator>
-        <SettingRow label="Watch memo create">
+      <SettingGroup title={t("setting.ai-assistant.triggers") as string} showSeparator>
+        <SettingRow label={t("setting.ai-assistant.watch-memo-create") as string}>
           <Switch checked={config.watch_memo_create} onCheckedChange={(checked) => updateConfig({ watch_memo_create: checked })} />
         </SettingRow>
-        <SettingRow label="Watch memo update">
+        <SettingRow label={t("setting.ai-assistant.watch-memo-update") as string}>
           <Switch checked={config.watch_memo_update} onCheckedChange={(checked) => updateConfig({ watch_memo_update: checked })} />
         </SettingRow>
-        <SettingRow label="Watch comment create">
+        <SettingRow label={t("setting.ai-assistant.watch-comment-create") as string}>
           <Switch checked={config.watch_comment_create} onCheckedChange={(checked) => updateConfig({ watch_comment_create: checked })} />
         </SettingRow>
       </SettingGroup>
 
-      <SettingGroup title="External adapters" showSeparator>
+      <SettingGroup title={t("setting.ai-assistant.external-adapters") as string} showSeparator>
         {config.external_action_adapters.map((adapter) => (
           <div key={adapter.id} className="rounded-lg border border-border p-3 space-y-3">
             <div className="flex items-center justify-between gap-3">
@@ -217,15 +229,15 @@ const AIAssistantSection = () => {
             </div>
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
               <div className="space-y-1.5">
-                <Label>Display name</Label>
+                <Label>{t("setting.ai-assistant.display-name") as string}</Label>
                 <Input value={adapter.display_name} onChange={(e) => updateAdapter(adapter.id, { display_name: e.target.value })} />
               </div>
               <div className="space-y-1.5">
-                <Label>Secret</Label>
+                <Label>{t("setting.ai-assistant.secret") as string}</Label>
                 <Input
                   type="password"
                   value={adapter.secret || ""}
-                  placeholder={adapter.secret_hint || "Configure secret"}
+                  placeholder={adapter.secret_hint || (t("setting.ai-assistant.secret-placeholder") as string)}
                   onChange={(e) => updateAdapter(adapter.id, { secret: e.target.value })}
                 />
               </div>

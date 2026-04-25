@@ -37,6 +37,7 @@ type APIV1Service struct {
 	MarkdownService markdown.Service
 	SSEHub          *SSEHub
 	BotConfigStore  *aibot.ConfigStore
+	BotLogger       *aibot.Logger
 	BotService      *aibot.Service
 	BotRunner       *botaibot.Runner
 
@@ -57,6 +58,7 @@ func NewAPIV1Service(secret string, profile *profile.Profile, store *store.Store
 		MarkdownService:          markdownService,
 		SSEHub:                   NewSSEHub(),
 		BotConfigStore:           aibot.NewConfigStore(profile, store),
+		BotLogger:                aibot.NewLogger(profile),
 		thumbnailSemaphore:       semaphore.NewWeighted(3), // Limit to 3 concurrent thumbnail generations
 		imageProcessingSemaphore: semaphore.NewWeighted(2),
 	}
@@ -136,12 +138,12 @@ func (s *APIV1Service) RegisterGateway(ctx context.Context, echoServer *echo.Ech
 	gwGroup.Any("/file/*", handler)
 	apiAuthenticator := auth.NewAuthenticator(s.Store, s.Secret)
 	if s.BotService == nil {
-		s.BotService = aibot.NewService(s.Store, s.BotConfigStore, botCommentCreator{api: s})
+		s.BotService = aibot.NewService(s.Store, s.BotConfigStore, s.BotLogger, botCommentCreator{api: s})
 	}
 	if s.BotRunner == nil {
 		s.BotRunner = botaibot.NewRunner(s.BotService)
 	}
-	RegisterAIAssistantRoutes(gwGroup, s.BotConfigStore, apiAuthenticator)
+	RegisterAIAssistantRoutes(gwGroup, s.BotConfigStore, s.BotLogger, s.BotService, apiAuthenticator, s.Store)
 
 	// Connect handlers for browser clients (replaces grpc-web).
 	logStacktraces := s.Profile.Demo
@@ -180,6 +182,10 @@ func (c botCommentCreator) CreateMemoComment(ctx context.Context, request *v1pb.
 
 func (c botCommentCreator) ListMemoComments(ctx context.Context, request *v1pb.ListMemoCommentsRequest) (*v1pb.ListMemoCommentsResponse, error) {
 	return c.api.ListMemoComments(ctx, request)
+}
+
+func (c botCommentCreator) GetMemo(ctx context.Context, request *v1pb.GetMemoRequest) (*v1pb.Memo, error) {
+	return c.api.GetMemo(ctx, request)
 }
 
 func (c botCommentCreator) ValidateFilter(ctx context.Context, filter string) error {

@@ -51,6 +51,7 @@ func (r *Runner) Enqueue(eventType string, memo *v1pb.Memo) {
 	if memo == nil {
 		return
 	}
+	slog.Info("AI assistant runner enqueue", slog.String("eventType", eventType), slog.String("memo", memo.GetName()))
 	select {
 	case r.queue <- job{eventType: eventType, memo: memo}:
 	default:

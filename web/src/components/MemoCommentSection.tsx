@@ -1,7 +1,8 @@
-import { MessageCircleIcon } from "lucide-react";
+import { MessageCircleIcon, ReplyIcon, XIcon } from "lucide-react";
 import { useState } from "react";
 import MemoEditor from "@/components/MemoEditor";
 import MemoView from "@/components/MemoView";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { extractMemoIdFromName } from "@/helpers/resource-names";
 import useCurrentUser from "@/hooks/useCurrentUser";
@@ -18,12 +19,16 @@ const MemoCommentSection = ({ memo, comments, parentPage }: Props) => {
   const t = useTranslate();
   const currentUser = useCurrentUser();
   const [showEditor, setShowEditor] = useState(false);
+  const [replyTarget, setReplyTarget] = useState<Memo | undefined>();
 
   const showCreateButton = currentUser && !showEditor;
 
   const handleCommentCreated = async (_memoCommentName: string) => {
     setShowEditor(false);
+    setReplyTarget(undefined);
   };
+
+  const replyPrefix = replyTarget ? `> ${replyTarget.content.replace(/\n/g, "\n> ")}\n\n` : undefined;
 
   return (
     <div className="pt-8 pb-16 w-full">
@@ -56,19 +61,52 @@ const MemoCommentSection = ({ memo, comments, parentPage }: Props) => {
         )}
         {showEditor && (
           <div className="w-full mb-2">
+            {replyTarget && (
+              <div className="mb-2 flex items-center justify-between rounded-lg border border-border bg-muted/30 px-3 py-2 text-sm">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary">{t("memo.comment.replying-to") as string}</Badge>
+                    <span className="truncate text-muted-foreground">{replyTarget.snippet || replyTarget.content}</span>
+                  </div>
+                </div>
+                <Button variant="ghost" size="icon" className="size-7" title={t("memo.comment.cancel-reply") as string} onClick={() => setReplyTarget(undefined)}>
+                  <XIcon className="w-4 h-4" />
+                </Button>
+              </div>
+            )}
             <MemoEditor
-              cacheKey={`${memo.name}-${memo.updateTime}-comment`}
+              cacheKey={`${memo.name}-${memo.updateTime}-comment${replyTarget ? `-${replyTarget.name}` : ""}`}
               placeholder={t("editor.add-your-comment-here")}
               parentMemoName={memo.name}
+              initialContent={replyPrefix}
               autoFocus
               onConfirm={handleCommentCreated}
-              onCancel={() => setShowEditor(false)}
+              onCancel={() => {
+                setShowEditor(false);
+                setReplyTarget(undefined);
+              }}
             />
           </div>
         )}
         {comments.map((comment) => (
           <div className="w-full" key={`${comment.name}-${comment.displayTime}`} id={extractMemoIdFromName(comment.name)}>
             <MemoView memo={comment} parentPage={parentPage} showCreator compact />
+            {currentUser && (
+              <div className="mt-1 mb-3 pl-3">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-muted-foreground"
+                  onClick={() => {
+                    setReplyTarget(comment);
+                    setShowEditor(true);
+                  }}
+                >
+                  <ReplyIcon className="mr-1 w-4 h-4" />
+                  {t("memo.comment.reply") as string}
+                </Button>
+              </div>
+            )}
           </div>
         ))}
       </div>

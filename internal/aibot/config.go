@@ -3,6 +3,7 @@ package aibot
 import (
 	"context"
 	"encoding/json"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -14,17 +15,7 @@ import (
 	"github.com/usememos/memos/store"
 )
 
-const (
-	ActionTypeReplyComment = "reply_comment"
-	ActionTypeExternalTodo = "external_todo"
-	AdapterTypeTickTick    = "ticktick"
-)
-
-type ActionSetting struct {
-	Enabled   bool   `json:"enabled"`
-	Type      string `json:"type"`
-	AdapterID string `json:"adapter_id,omitempty"`
-}
+const AdapterTypeTickTick = "ticktick"
 
 type ExternalActionAdapter struct {
 	ID          string `json:"id"`
@@ -35,45 +26,44 @@ type ExternalActionAdapter struct {
 	SecretHint  string `json:"secret_hint,omitempty"`
 }
 
+type RuleGroup struct {
+	ID            string   `json:"id"`
+	Name          string   `json:"name"`
+	Tags          []string `json:"tags"`
+	PersonaPrompt string   `json:"persona_prompt"`
+	SystemPrompt  string   `json:"system_prompt"`
+}
+
 type Config struct {
-	Enabled            bool                    `json:"enabled"`
-	BotUser            string                  `json:"bot_user"`
-	ProviderID         string                  `json:"provider_id"`
-	PersonaPrompt      string                  `json:"persona_prompt"`
-	SystemPrompt       string                  `json:"system_prompt"`
-	TriggerFilter      string                  `json:"trigger_filter"`
-	WatchMemoCreate    bool                    `json:"watch_memo_create"`
-	WatchMemoUpdate    bool                    `json:"watch_memo_update"`
-	WatchCommentCreate bool                    `json:"watch_comment_create"`
-	MaxContextComments int32                   `json:"max_context_comments"`
-	ClassifyModel      string                  `json:"classify_model"`
-	ReplyModel         string                  `json:"reply_model"`
-	QuestionAction     ActionSetting           `json:"question_action"`
-	EmotionAction      ActionSetting           `json:"emotion_action"`
-	TodoAction         ActionSetting           `json:"todo_action"`
-	ExternalAdapters   []ExternalActionAdapter `json:"external_action_adapters"`
+	Enabled             bool                    `json:"enabled"`
+	BotUser             string                  `json:"bot_user"`
+	ProviderID          string                  `json:"provider_id"`
+	RuleGroups          []RuleGroup             `json:"rule_groups"`
+	LegacyTriggerFilter string                 `json:"trigger_filter,omitempty"`
+	MaxContextComments  int32                   `json:"max_context_comments"`
+	ReplyModel          string                  `json:"reply_model"`
+	ExternalAdapters    []ExternalActionAdapter `json:"external_action_adapters"`
 }
 
 func DefaultConfig() Config {
 	return Config{
 		Enabled:            false,
-		WatchMemoCreate:    true,
-		WatchMemoUpdate:    true,
-		WatchCommentCreate: true,
 		MaxContextComments: 10,
-		QuestionAction: ActionSetting{
-			Enabled: true,
-			Type:    ActionTypeReplyComment,
-		},
-		EmotionAction: ActionSetting{
-			Enabled: true,
-			Type:    ActionTypeReplyComment,
-		},
-		TodoAction: ActionSetting{
-			Enabled: true,
-			Type:    ActionTypeExternalTodo,
-		},
 	}
+}
+
+type legacyConfig struct {
+	Enabled             bool                    `json:"enabled"`
+	BotUser             string                  `json:"bot_user"`
+	ProviderID          string                  `json:"provider_id"`
+	RuleGroups          []RuleGroup             `json:"rule_groups"`
+	LegacyTriggerFilter string                 `json:"trigger_filter,omitempty"`
+	WatchMemoCreate     bool                    `json:"watch_memo_create"`
+	WatchMemoUpdate     bool                    `json:"watch_memo_update"`
+	WatchCommentCreate  bool                    `json:"watch_comment_create"`
+	MaxContextComments  int32                   `json:"max_context_comments"`
+	ReplyModel          string                  `json:"reply_model"`
+	ExternalAdapters    []ExternalActionAdapter `json:"external_action_adapters"`
 }
 
 type ConfigStore struct {
@@ -96,6 +86,7 @@ func (s *ConfigStore) Load(ctx context.Context) (Config, error) {
 	if s.cache.ProviderID != "" || s.cache.BotUser != "" || s.cache.Enabled {
 		cfg := s.cache
 		s.mu.RUnlock()
+		slog.Info("AI assistant config loaded from cache", slog.Bool("enabled", cfg.Enabled), slog.String("provider", cfg.ProviderID), slog.String("bot_user", cfg.BotUser), slog.Int("rule_groups", len(cfg.RuleGroups)))
 		return cfg, nil
 	}
 	s.mu.RUnlock()
@@ -105,6 +96,7 @@ func (s *ConfigStore) Load(ctx context.Context) (Config, error) {
 		return Config{}, err
 	}
 	if err := s.validate(ctx, &cfg); err != nil {
+		slog.Warn("AI assistant config validate error", slog.Any("err", err))
 		return Config{}, err
 	}
 	s.mu.Lock()
@@ -153,7 +145,35 @@ func (s *ConfigStore) validate(ctx context.Context, cfg *Config) error {
 	}
 	cfg.BotUser = strings.TrimSpace(cfg.BotUser)
 	cfg.ProviderID = strings.TrimSpace(cfg.ProviderID)
-	cfg.TriggerFilter = strings.TrimSpace(cfg.TriggerFilter)
+	if len(cfg.RuleGroups) > 0 {
+		seenRuleTags := make(map[string]string)
+		normalizedGroups := make([]RuleGroup, 0, len(cfg.RuleGroups))
+		for i := range cfg.RuleGroups {
+			group := cfg.RuleGroups[i]
+			group.ID = strings.TrimSpace(group.ID)
+			group.Name = strings.TrimSpace(group.Name)
+			group.PersonaPrompt = strings.TrimSpace(group.PersonaPrompt)
+			group.SystemPrompt = strings.TrimSpace(group.SystemPrompt)
+			group.Tags = normalizeUniqueTags(group.Tags)
+			if group.ID == "" {
+				group.ID = "rule-" + strings.ReplaceAll(strings.ToLower(group.Name), " ", "-")
+			}
+			if group.Name == "" {
+				return errors.New("rule group name is required")
+			}
+			if len(group.Tags) == 0 {
+				return errors.Errorf("rule group %q must contain at least one tag", group.Name)
+			}
+			for _, tag := range group.Tags {
+				if previousGroup, exists := seenRuleTags[tag]; exists {
+					return errors.Errorf("tag %q is already used by rule group %q", tag, previousGroup)
+				}
+				seenRuleTags[tag] = group.Name
+			}
+			normalizedGroups = append(normalizedGroups, group)
+		}
+		cfg.RuleGroups = normalizedGroups
+	}
 	for i := range cfg.ExternalAdapters {
 		adapter := &cfg.ExternalAdapters[i]
 		adapter.ID = strings.TrimSpace(adapter.ID)
@@ -163,6 +183,9 @@ func (s *ConfigStore) validate(ctx context.Context, cfg *Config) error {
 	if !cfg.Enabled {
 		return nil
 	}
+	if len(cfg.RuleGroups) == 0 {
+		return errors.New("at least one rule group is required when enabled")
+	}
 	if cfg.BotUser == "" {
 		return errors.New("bot_user is required when enabled")
 	}
@@ -171,9 +194,6 @@ func (s *ConfigStore) validate(ctx context.Context, cfg *Config) error {
 	}
 	if strings.TrimSpace(cfg.ReplyModel) == "" {
 		return errors.New("reply_model is required when enabled")
-	}
-	if strings.TrimSpace(cfg.ClassifyModel) == "" {
-		cfg.ClassifyModel = cfg.ReplyModel
 	}
 	user, err := resolveBotUser(ctx, s.store, cfg.BotUser)
 	if err != nil {
@@ -201,12 +221,14 @@ func (s *ConfigStore) validate(ctx context.Context, cfg *Config) error {
 
 func (s *ConfigStore) sanitized(cfg Config) Config {
 	clone := cfg
+	clone.RuleGroups = append([]RuleGroup(nil), cfg.RuleGroups...)
 	clone.ExternalAdapters = make([]ExternalActionAdapter, 0, len(cfg.ExternalAdapters))
 	for _, adapter := range cfg.ExternalAdapters {
 		adapter.SecretHint = maskSecret(adapter.Secret)
 		adapter.Secret = ""
 		clone.ExternalAdapters = append(clone.ExternalAdapters, adapter)
 	}
+	clone.LegacyTriggerFilter = ""
 	return clone
 }
 
@@ -215,14 +237,25 @@ func (s *ConfigStore) readFromDisk() (Config, error) {
 	bytes, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
+			slog.Info("AI assistant config file not found, using defaults", slog.String("path", path))
 			return DefaultConfig(), nil
 		}
 		return Config{}, errors.Wrap(err, "failed to read AI assistant config")
 	}
-	cfg := DefaultConfig()
-	if err := json.Unmarshal(bytes, &cfg); err != nil {
+	slog.Info("AI assistant config file found", slog.String("path", path))
+	legacy := legacyConfig{}
+	if err := json.Unmarshal(bytes, &legacy); err != nil {
 		return Config{}, errors.Wrap(err, "failed to unmarshal AI assistant config")
 	}
+	cfg := DefaultConfig()
+	cfg.Enabled = legacy.Enabled
+	cfg.BotUser = legacy.BotUser
+	cfg.ProviderID = legacy.ProviderID
+	cfg.RuleGroups = legacy.RuleGroups
+	cfg.LegacyTriggerFilter = legacy.LegacyTriggerFilter
+	cfg.MaxContextComments = legacy.MaxContextComments
+	cfg.ReplyModel = legacy.ReplyModel
+	cfg.ExternalAdapters = legacy.ExternalAdapters
 	return cfg, nil
 }
 
@@ -239,6 +272,20 @@ func maskSecret(secret string) string {
 		return "****"
 	}
 	return secret[:4] + "..." + secret[len(secret)-2:]
+}
+
+func normalizeUniqueTags(tags []string) []string {
+	normalizedTags := make([]string, 0, len(tags))
+	seenTags := make(map[string]bool)
+	for _, tag := range tags {
+		tag = strings.TrimSpace(tag)
+		if tag == "" || seenTags[tag] {
+			continue
+		}
+		seenTags[tag] = true
+		normalizedTags = append(normalizedTags, tag)
+	}
+	return normalizedTags
 }
 
 func resolveBotUser(ctx context.Context, stores *store.Store, name string) (*store.User, error) {

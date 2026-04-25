@@ -7,13 +7,14 @@ import { useEditorContext } from "../state";
 interface UseMemoInitOptions {
   editorRef: React.RefObject<EditorRefActions | null>;
   memo?: Memo;
+  initialContent?: string;
   cacheKey?: string;
   username: string;
   autoFocus?: boolean;
   defaultVisibility?: Visibility;
 }
 
-export const useMemoInit = ({ editorRef, memo, cacheKey, username, autoFocus, defaultVisibility }: UseMemoInitOptions) => {
+export const useMemoInit = ({ editorRef, memo, initialContent, cacheKey, username, autoFocus, defaultVisibility }: UseMemoInitOptions) => {
   const { actions, dispatch } = useEditorContext();
   const initializedRef = useRef(false);
   const [isInitialized, setIsInitialized] = useState(false);
@@ -29,9 +30,11 @@ export const useMemoInit = ({ editorRef, memo, cacheKey, username, autoFocus, de
       dispatch(actions.initMemo(initialState));
     } else {
       const cachedContent = cacheService.load(key);
-      if (cachedContent) {
-        dispatch(actions.updateContent(cachedContent));
-      }
+		if (cachedContent) {
+			dispatch(actions.updateContent(cachedContent));
+		} else if (initialContent) {
+			dispatch(actions.updateContent(initialContent));
+		}
       if (defaultVisibility !== undefined) {
         dispatch(actions.setMetadata({ visibility: defaultVisibility }));
       }
@@ -42,7 +45,7 @@ export const useMemoInit = ({ editorRef, memo, cacheKey, username, autoFocus, de
     }
 
     setIsInitialized(true);
-  }, [memo, cacheKey, username, autoFocus, defaultVisibility, actions, dispatch, editorRef]);
+	}, [memo, initialContent, cacheKey, username, autoFocus, defaultVisibility, actions, dispatch, editorRef]);
 
   return { isInitialized };
 };

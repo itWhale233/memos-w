@@ -1,5 +1,6 @@
 import { create } from "@bufbuild/protobuf";
 import { FileIcon } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { extractMemoIdFromName } from "@/helpers/resource-names";
 import { cn } from "@/lib/utils";
 import type { Attachment } from "@/types/proto/api/v1/attachment_service_pb";
@@ -18,6 +19,7 @@ interface MemoPreviewProps {
   className?: string;
   creator?: User;
   showCreator?: boolean;
+  aiBotUsername?: string;
   showMemoId?: boolean;
   truncate?: boolean;
 }
@@ -76,16 +78,19 @@ const AttachmentThumbnails = ({ attachments }: { attachments: Attachment[] }) =>
 const PreviewMeta = ({
   creator,
   showCreator,
+  aiBotUsername,
   memoName,
   showMemoId,
 }: {
   creator?: User;
   showCreator?: boolean;
+  aiBotUsername?: string;
   memoName?: string;
   showMemoId?: boolean;
 }) => {
   const creatorName = creator?.displayName || creator?.username;
   const memoId = showMemoId && memoName ? extractMemoIdFromName(memoName).slice(0, 6) : undefined;
+  const isAIBot = !!creator?.username && !!aiBotUsername && creator.username === aiBotUsername;
 
   if (!creatorName && !memoId) {
     return null;
@@ -96,7 +101,12 @@ const PreviewMeta = ({
       {showMemoId && memoId && (
         <span className="text-[8px] font-mono px-1 py-0.5 rounded border border-border bg-muted/40 shrink-0">{memoId}</span>
       )}
-      {showCreator && creatorName && <span className="font-medium text-foreground/80 truncate">{creatorName}</span>}
+      {showCreator && creatorName && (
+        <span className="inline-flex items-center gap-1.5 truncate">
+          <span className="font-medium text-foreground/80 truncate">{creatorName}</span>
+          {isAIBot && <Badge variant="secondary">AI</Badge>}
+        </span>
+      )}
     </div>
   );
 };
@@ -109,6 +119,7 @@ const MemoPreview = ({
   className,
   creator,
   showCreator = false,
+  aiBotUsername,
   showMemoId = false,
   truncate = false,
 }: MemoPreviewProps) => {
@@ -120,7 +131,7 @@ const MemoPreview = ({
     return null;
   }
 
-  const meta = <PreviewMeta creator={creator} showCreator={showCreator} memoName={name} showMemoId={showMemoId} />;
+  const meta = <PreviewMeta creator={creator} showCreator={showCreator} aiBotUsername={aiBotUsername} memoName={name} showMemoId={showMemoId} />;
   const contentNode = truncate ? (
     hasContent ? (
       <div className="text-sm text-muted-foreground truncate min-w-0">{content}</div>

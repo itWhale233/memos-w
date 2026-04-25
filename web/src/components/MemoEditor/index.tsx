@@ -43,6 +43,7 @@ const MemoEditorImpl: React.FC<MemoEditorProps> = ({
   className,
   cacheKey,
   memo,
+  initialContent,
   parentMemoName,
   autoFocus,
   placeholder,
@@ -68,7 +69,7 @@ const MemoEditorImpl: React.FC<MemoEditorProps> = ({
   // Get default visibility from user settings
   const defaultVisibility = userGeneralSetting?.memoVisibility ? convertVisibilityFromString(userGeneralSetting.memoVisibility) : undefined;
 
-  const { isInitialized } = useMemoInit({ editorRef, memo, cacheKey, username: currentUser?.name ?? "", autoFocus, defaultVisibility });
+  const { isInitialized } = useMemoInit({ editorRef, memo, initialContent, cacheKey, username: currentUser?.name ?? "", autoFocus, defaultVisibility });
   const isDraftCacheEnabled = !memo;
 
   // Auto-save content to localStorage

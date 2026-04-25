@@ -9,6 +9,7 @@ export interface MemoEditorProps {
   placeholder?: string;
   /** Existing memo to edit. When provided, the editor initializes from it without fetching. */
   memo?: Memo;
+  initialContent?: string;
   parentMemoName?: string;
   autoFocus?: boolean;
   onConfirm?: (memoName: string) => void;

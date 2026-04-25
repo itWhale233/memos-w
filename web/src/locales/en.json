@@ -226,7 +226,10 @@
     "code": "Code",
     "comment": {
       "self": "Comments",
-      "write-a-comment": "Write a comment"
+      "write-a-comment": "Write a comment",
+      "reply": "Reply",
+      "replying-to": "Replying to",
+      "cancel-reply": "Cancel reply"
     },
     "copy-content": "Copy Content",
     "copy-link": "Copy Link",
@@ -452,7 +455,20 @@
       "external-adapters": "External adapters",
       "display-name": "Display name",
       "secret": "Secret",
-      "secret-placeholder": "Configure secret"
+      "secret-placeholder": "Configure secret",
+      "rule-groups": "Rule groups",
+      "add-rule-group": "Add rule group",
+      "search-tags": "Search tags",
+      "no-tags-selected": "No tags selected",
+      "no-search-results": "No matching tags",
+      "execution-logs": "Execution logs",
+      "refresh-logs": "Refresh logs",
+      "no-logs": "No logs yet.",
+      "target-label": "Target",
+      "model-label": "Model",
+      "trigger-bot": "Trigger AI Bot",
+      "triggering-bot": "Triggering AI Bot...",
+      "triggered-bot": "AI Bot triggered"
     },
     "instance": {
       "disallow-change-nickname": "Disallow changing nickname",

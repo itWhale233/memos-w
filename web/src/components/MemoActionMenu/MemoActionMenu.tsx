@@ -6,11 +6,13 @@ import {
   CopyIcon,
   Edit3Icon,
   FileTextIcon,
+  HeartHandshakeIcon,
   LinkIcon,
   MoreVerticalIcon,
   TrashIcon,
 } from "lucide-react";
 import { useState } from "react";
+import toast from "react-hot-toast";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { Button } from "@/components/ui/button";
 import {
@@ -22,7 +24,10 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import useCurrentUser from "@/hooks/useCurrentUser";
+import { handleError } from "@/lib/error";
 import { State } from "@/types/proto/api/v1/common_pb";
+import { User_Role } from "@/types/proto/api/v1/user_service_pb";
 import { useTranslate } from "@/utils/i18n";
 import { useMemoActionHandlers } from "./hooks";
 import type { MemoActionMenuProps } from "./types";
@@ -30,13 +35,16 @@ import type { MemoActionMenuProps } from "./types";
 const MemoActionMenu = (props: MemoActionMenuProps) => {
   const { memo, readonly } = props;
   const t = useTranslate();
+  const currentUser = useCurrentUser();
 
   // Dialog state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [triggeringBot, setTriggeringBot] = useState(false);
 
   // Derived state
   const isComment = Boolean(memo.parent);
   const isArchived = memo.state === State.ARCHIVED;
+  const isAdmin = currentUser?.role === User_Role.ADMIN;
 
   // Action handlers
   const {
@@ -53,6 +61,30 @@ const MemoActionMenu = (props: MemoActionMenuProps) => {
     setDeleteDialogOpen,
   });
 
+  const handleManualTriggerBot = async () => {
+    if (triggeringBot) {
+      return;
+    }
+    setTriggeringBot(true);
+    try {
+      const response = await fetch("/api/v1/ai-assistant/trigger", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ memo_name: memo.name }),
+      });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({ message: "Trigger failed" }));
+        throw new Error(payload.message || "Trigger failed");
+      }
+      toast.success(t("setting.ai-assistant.triggered-bot") as string);
+    } catch (error) {
+      handleError(error, toast.error, { context: t("setting.ai-assistant.trigger-bot") as string });
+    } finally {
+      setTriggeringBot(false);
+    }
+  };
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -64,6 +96,12 @@ const MemoActionMenu = (props: MemoActionMenuProps) => {
         {/* Edit actions (non-readonly, non-archived) */}
         {!readonly && !isArchived && (
           <>
+            {isAdmin && !isComment && (
+              <DropdownMenuItem onClick={handleManualTriggerBot} disabled={triggeringBot}>
+                <HeartHandshakeIcon className="w-4 h-auto" />
+                {triggeringBot ? (t("setting.ai-assistant.triggering-bot") as string) : (t("setting.ai-assistant.trigger-bot") as string)}
+              </DropdownMenuItem>
+            )}
             {!isComment && (
               <DropdownMenuItem onClick={handleTogglePinMemoBtnClick}>
                 {memo.pinned ? <BookmarkMinusIcon className="w-4 h-auto" /> : <BookmarkPlusIcon className="w-4 h-auto" />}

@@ -219,6 +219,19 @@ func (s *APIV1Service) batchConvertMemoRelations(ctx context.Context, memos []*s
 		memoIDSet[m.ID] = true
 	}
 
+	allRelations := make([]*store.MemoRelation, 0)
+	commentType := store.MemoRelationComment
+	for _, m := range memos {
+		commentRelations, err := s.Store.ListMemoRelations(ctx, &store.FindMemoRelation{
+			RelatedMemoID: &m.ID,
+			Type:          &commentType,
+		})
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to batch list comment memo relations")
+		}
+		allRelations = append(allRelations, commentRelations...)
+	}
+
 	outgoingRelations, err := s.Store.ListMemoRelations(ctx, &store.FindMemoRelation{
 		SourceMemoIDList: memoIDs,
 		MemoFilter:       &memoFilter,
@@ -233,7 +246,7 @@ func (s *APIV1Service) batchConvertMemoRelations(ctx context.Context, memos []*s
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to batch list incoming memo relations")
 	}
-	allRelations := mergeMemoRelations(outgoingRelations, incomingRelations)
+	allRelations = mergeMemoRelations(allRelations, outgoingRelations, incomingRelations)
 
 	// Collect all memo IDs referenced in relations that we need to resolve.
 	neededIDs := make(map[int32]bool)

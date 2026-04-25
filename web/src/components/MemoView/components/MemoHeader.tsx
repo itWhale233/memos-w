@@ -2,6 +2,8 @@ import { timestampDate } from "@bufbuild/protobuf/wkt";
 import { BookmarkIcon } from "lucide-react";
 import { useCallback, useState } from "react";
 import { Link } from "react-router-dom";
+import { Badge } from "@/components/ui/badge";
+import useAIConfig from "@/hooks/useAIConfig";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import useNavigateTo from "@/hooks/useNavigateTo";
 import i18n from "@/i18n";
@@ -23,6 +25,7 @@ const MemoHeader: React.FC<MemoHeaderProps> = ({ showCreator, showVisibility, sh
   const [reactionSelectorOpen, setReactionSelectorOpen] = useState(false);
 
   const { memo, creator, currentUser, parentPage, isArchived, readonly, openEditor } = useMemoViewContext();
+  const { bot_user } = useAIConfig();
   const { relativeTimeFormat } = useMemoViewDerived();
 
   const navigateTo = useNavigateTo();
@@ -46,7 +49,7 @@ const MemoHeader: React.FC<MemoHeaderProps> = ({ showCreator, showVisibility, sh
     <div className="w-full flex flex-row justify-between items-center gap-2">
       <div className="w-auto max-w-[calc(100%-8rem)] grow flex flex-row justify-start items-center">
         {showCreator && creator ? (
-          <CreatorDisplay creator={creator} displayTime={displayTime} onGotoDetail={handleGotoMemoDetailPage} />
+          <CreatorDisplay creator={creator} botUser={bot_user} displayTime={displayTime} onGotoDetail={handleGotoMemoDetailPage} />
         ) : (
           <TimeDisplay displayTime={displayTime} onGotoDetail={handleGotoMemoDetailPage} />
         )}
@@ -97,22 +100,25 @@ const MemoHeader: React.FC<MemoHeaderProps> = ({ showCreator, showVisibility, sh
 
 interface CreatorDisplayProps {
   creator: User;
+  botUser?: string;
   displayTime: React.ReactNode;
   onGotoDetail: () => void;
 }
 
-const CreatorDisplay: React.FC<CreatorDisplayProps> = ({ creator, displayTime, onGotoDetail }) => (
+const CreatorDisplay: React.FC<CreatorDisplayProps> = ({ creator, botUser, displayTime, onGotoDetail }) => {
+  const botUsername = botUser?.replace(/^users\//, "").trim();
+  const isAIBot = !!botUsername && creator.username === botUsername;
+  return (
   <div className="w-full flex flex-row justify-start items-center">
     <Link className="w-auto hover:opacity-80 rounded-md transition-colors" to={`/u/${encodeURIComponent(creator.username)}`} viewTransition>
       <UserAvatar className="mr-2 shrink-0" avatarUrl={creator.avatarUrl} />
     </Link>
     <div className="w-full flex flex-col justify-center items-start">
-      <Link
-        className="block leading-tight hover:opacity-80 rounded-md transition-colors truncate text-muted-foreground"
-        to={`/u/${encodeURIComponent(creator.username)}`}
-        viewTransition
-      >
-        {creator.displayName || creator.username}
+      <Link className="block leading-tight hover:opacity-80 rounded-md transition-colors truncate text-muted-foreground" to={`/u/${encodeURIComponent(creator.username)}`} viewTransition>
+        <span className="inline-flex items-center gap-1.5">
+          <span>{creator.displayName || creator.username}</span>
+          {isAIBot && <Badge variant="secondary">AI</Badge>}
+        </span>
       </Link>
       <button
         type="button"
@@ -123,7 +129,8 @@ const CreatorDisplay: React.FC<CreatorDisplayProps> = ({ creator, displayTime, o
       </button>
     </div>
   </div>
-);
+  );
+};
 
 interface TimeDisplayProps {
   displayTime: React.ReactNode;

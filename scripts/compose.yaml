@@ -1,6 +1,12 @@
 services:
   memos:
-    image: neosmemo/memos:stable
+    image: ${MEMOS_IMAGE:-whale/memos:latest}
+    build:
+      context: ..
+      dockerfile: scripts/Dockerfile
+      args:
+        VERSION: ${MEMOS_VERSION:-dev}
+        COMMIT: ${MEMOS_COMMIT:-local}
     container_name: memos
     volumes:
       - ~/.memos/:/var/opt/memos

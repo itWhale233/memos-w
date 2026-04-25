@@ -1,19 +1,31 @@
+FROM --platform=$BUILDPLATFORM node:24-alpine AS frontend
+WORKDIR /frontend-build/web
+
+# Install frontend dependencies from lockfile first for better layer caching.
+COPY web/package.json web/pnpm-lock.yaml ./
+RUN corepack enable && pnpm install --frozen-lockfile
+
+# Copy the rest of the repository so the frontend build can emit assets into
+# server/router/frontend/dist as expected by the backend.
+WORKDIR /frontend-build
+COPY . .
+RUN corepack enable && cd web && pnpm release
+
 FROM --platform=$BUILDPLATFORM golang:1.26.1-alpine AS backend
 WORKDIR /backend-build
 
-# Install build dependencies
+# Install build dependencies.
 RUN apk add --no-cache git ca-certificates
 
-# Copy go mod files and download dependencies (cached layer)
+# Copy go mod files and download dependencies (cached layer).
 COPY go.mod go.sum ./
 RUN --mount=type=cache,target=/go/pkg/mod \
     go mod download
 
-# Copy source code (use .dockerignore to exclude unnecessary files)
+# Copy source code and the prebuilt frontend assets from the frontend stage.
 COPY . .
+COPY --from=frontend /frontend-build/server/router/frontend/dist ./server/router/frontend/dist
 
-# Please build frontend first, so that the static files are available.
-# Refer to `pnpm release` in package.json for the build command.
 ARG TARGETOS TARGETARCH VERSION=dev COMMIT=unknown
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \

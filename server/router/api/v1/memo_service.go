@@ -664,6 +664,10 @@ func (s *APIV1Service) CreateMemoComment(ctx context.Context, request *v1pb.Crea
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to create memo relation")
 	}
+	// Keep the API response aligned with persisted comment relations so downstream
+	// consumers (including the AI bot runner) can treat this as a comment event.
+	memoComment.Parent = &request.Name
+	memoComment.Visibility = convertVisibilityFromStore(relatedMemo.Visibility)
 	creator, err := ResolveUserByName(ctx, s.Store, memoComment.Creator)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid memo creator")

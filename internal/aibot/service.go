@@ -155,10 +155,25 @@ func (s *Service) matchRuleGroupForEvent(ctx context.Context, cfg Config, memo *
 	if ruleGroup, matched := s.matchRuleGroup(cfg, memo); matched {
 		return ruleGroup, true, "memo", nil
 	}
-	if memo.GetParent() == "" {
+	parentMemoName := memo.GetParent()
+	if parentMemoName == "" {
+		memoUID := strings.TrimPrefix(memo.GetName(), "memos/")
+		commentMemo, err := s.store.GetMemo(ctx, &store.FindMemo{UID: &memoUID})
+		if err == nil && commentMemo != nil {
+			commentType := store.MemoRelationComment
+			relations, relationErr := s.store.ListMemoRelations(ctx, &store.FindMemoRelation{MemoID: &commentMemo.ID, Type: &commentType})
+			if relationErr == nil && len(relations) > 0 {
+				parentMemo, parentErr := s.store.GetMemo(ctx, &store.FindMemo{ID: &relations[0].RelatedMemoID})
+				if parentErr == nil && parentMemo != nil {
+					parentMemoName = "memos/" + parentMemo.UID
+				}
+			}
+		}
+	}
+	if parentMemoName == "" {
 		return nil, false, "", nil
 	}
-	parentMemo, err := s.creator.GetMemo(ctx, &v1pb.GetMemoRequest{Name: memo.GetParent()})
+	parentMemo, err := s.creator.GetMemo(ctx, &v1pb.GetMemoRequest{Name: parentMemoName})
 	if err != nil {
 		return nil, false, "", errors.Wrap(err, "failed to get parent memo for rule-group matching")
 	}

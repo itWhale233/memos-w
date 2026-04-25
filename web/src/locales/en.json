@@ -229,7 +229,8 @@
       "write-a-comment": "Write a comment",
       "reply": "Reply",
       "replying-to": "Replying to",
-      "cancel-reply": "Cancel reply"
+      "cancel-reply": "Cancel reply",
+      "bot-thinking": "Bot is thinking..."
     },
     "copy-content": "Copy Content",
     "copy-link": "Copy Link",

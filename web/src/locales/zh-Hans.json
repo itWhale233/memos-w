@@ -191,7 +191,8 @@
       "write-a-comment": "写评论",
       "reply": "回复",
       "replying-to": "正在回复",
-      "cancel-reply": "取消回复"
+      "cancel-reply": "取消回复",
+      "bot-thinking": "Bot 思考中..."
     },
     "copy-content": "复制内容",
     "copy-link": "复制链接",

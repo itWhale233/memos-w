@@ -1,10 +1,11 @@
 import { MessageCircleIcon, ReplyIcon, XIcon } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import MemoEditor from "@/components/MemoEditor";
 import MemoView from "@/components/MemoView";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { extractMemoIdFromName } from "@/helpers/resource-names";
+import useAIConfig from "@/hooks/useAIConfig";
 import useCurrentUser from "@/hooks/useCurrentUser";
 import type { Memo } from "@/types/proto/api/v1/memo_service_pb";
 import { useTranslate } from "@/utils/i18n";
@@ -18,15 +19,36 @@ interface Props {
 const MemoCommentSection = ({ memo, comments, parentPage }: Props) => {
   const t = useTranslate();
   const currentUser = useCurrentUser();
+  const { bot_user, enabled } = useAIConfig();
   const [showEditor, setShowEditor] = useState(false);
   const [replyTarget, setReplyTarget] = useState<Memo | undefined>();
+  const [botThinking, setBotThinking] = useState(false);
+  const [pendingBotReplyCount, setPendingBotReplyCount] = useState<number | undefined>();
+
+  const botUsername = bot_user?.replace(/^users\//, "").trim();
+  const botResourceName = botUsername ? `users/${botUsername}` : undefined;
+  const botReplyCount = useMemo(() => comments.filter((comment) => comment.creator === botResourceName).length, [comments, botResourceName]);
 
   const showCreateButton = currentUser && !showEditor;
 
   const handleCommentCreated = async (_memoCommentName: string) => {
     setShowEditor(false);
     setReplyTarget(undefined);
+    if (enabled) {
+      setPendingBotReplyCount(botReplyCount);
+      setBotThinking(true);
+    }
   };
+
+  useEffect(() => {
+    if (!botThinking || !botResourceName) {
+      return;
+    }
+    if (pendingBotReplyCount !== undefined && botReplyCount > pendingBotReplyCount) {
+      setBotThinking(false);
+      setPendingBotReplyCount(undefined);
+    }
+  }, [botThinking, botResourceName, botReplyCount, pendingBotReplyCount]);
 
   const replyPrefix = replyTarget ? `> ${replyTarget.content.replace(/\n/g, "\n> ")}\n\n` : undefined;
 
@@ -51,6 +73,7 @@ const MemoCommentSection = ({ memo, comments, parentPage }: Props) => {
               <MessageCircleIcon className="w-5 h-auto text-muted-foreground mr-1" />
               <span className="text-muted-foreground text-sm">{t("memo.comment.self")}</span>
               <span className="text-muted-foreground text-sm ml-1">({comments.length})</span>
+              {botThinking && <span className="text-muted-foreground text-sm ml-2">{t("memo.comment.bot-thinking") as string}</span>}
             </div>
             {showCreateButton && (
               <Button variant="ghost" className="text-muted-foreground" onClick={() => setShowEditor(true)}>

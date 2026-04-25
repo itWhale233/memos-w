@@ -58,7 +58,40 @@ func (s *Service) ConvertMemoForBot(ctx context.Context, memo *store.Memo) (*v1p
 	if memo == nil {
 		return nil, errors.New("memo is nil")
 	}
-	return s.creator.GetMemo(ctx, &v1pb.GetMemoRequest{Name: "memos/" + memo.UID})
+	creator, err := s.store.GetUser(ctx, &store.FindUser{ID: &memo.CreatorID})
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get memo creator")
+	}
+	if creator == nil {
+		return nil, errors.New("memo creator not found")
+	}
+	message := &v1pb.Memo{
+		Name:       "memos/" + memo.UID,
+		Creator:    "users/" + creator.Username,
+		Content:    memo.Content,
+		Visibility: convertVisibilityForBot(memo.Visibility),
+	}
+	if memo.Payload != nil {
+		message.Tags = append([]string(nil), memo.Payload.Tags...)
+	}
+	if memo.ParentUID != nil {
+		parent := "memos/" + *memo.ParentUID
+		message.Parent = &parent
+	}
+	return message, nil
+}
+
+func convertVisibilityForBot(visibility store.Visibility) v1pb.Visibility {
+	switch visibility {
+	case store.Private:
+		return v1pb.Visibility_PRIVATE
+	case store.Protected:
+		return v1pb.Visibility_PROTECTED
+	case store.Public:
+		return v1pb.Visibility_PUBLIC
+	default:
+		return v1pb.Visibility_VISIBILITY_UNSPECIFIED
+	}
 }
 
 func (s *Service) ProcessMemoEvent(ctx context.Context, eventType string, memo *v1pb.Memo) error {
@@ -173,12 +206,17 @@ func (s *Service) matchRuleGroupForEvent(ctx context.Context, cfg Config, memo *
 	if parentMemoName == "" {
 		return nil, false, "", nil
 	}
-	parentMemo, err := s.creator.GetMemo(ctx, &v1pb.GetMemoRequest{Name: parentMemoName})
+	parentMemoUID := strings.TrimPrefix(parentMemoName, "memos/")
+	parentMemoStore, err := s.store.GetMemo(ctx, &store.FindMemo{UID: &parentMemoUID})
 	if err != nil {
 		return nil, false, "", errors.Wrap(err, "failed to get parent memo for rule-group matching")
 	}
-	if parentMemo == nil {
+	if parentMemoStore == nil {
 		return nil, false, "", nil
+	}
+	parentMemo, err := s.ConvertMemoForBot(ctx, parentMemoStore)
+	if err != nil {
+		return nil, false, "", errors.Wrap(err, "failed to convert parent memo for rule-group matching")
 	}
 	if ruleGroup, matched := s.matchRuleGroup(cfg, parentMemo); matched {
 		return ruleGroup, true, "parent_memo", nil

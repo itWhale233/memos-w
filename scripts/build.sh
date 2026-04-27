@@ -1,32 +1,32 @@
 #!/bin/sh
 
-set -e
+set -eu
 
-# Change to repo root
 cd "$(dirname "$0")/../"
 
-OS=$(uname -s)
+IMAGE_NAME="${IMAGE_NAME:-itwhale/memos:latest}"
+VERSION="${VERSION:-dev}"
+COMMIT="${COMMIT:-unknown}"
 
-# Determine output binary name
-case "$OS" in
-  *CYGWIN*|*MINGW*|*MSYS*)
-    OUTPUT="./build/memos.exe"
-    ;;
-  *)
-    OUTPUT="./build/memos"
-    ;;
-esac
+if command -v git >/dev/null 2>&1; then
+  if [ "$VERSION" = "dev" ]; then
+    VERSION="$(git describe --tags --always 2>/dev/null || echo dev)"
+  fi
+  if [ "$COMMIT" = "unknown" ]; then
+    COMMIT="$(git rev-parse --short HEAD 2>/dev/null || echo unknown)"
+  fi
+fi
 
-echo "Building for $OS..."
+echo "Building Docker image: $IMAGE_NAME"
+echo "Version: $VERSION"
+echo "Commit: $COMMIT"
 
-# Ensure build directories exist and configure a writable Go build cache
-mkdir -p ./build/.gocache ./build/.gomodcache
-export GOCACHE="$(pwd)/build/.gocache"
-export GOMODCACHE="$(pwd)/build/.gomodcache"
+docker build \
+  -f scripts/Dockerfile \
+  -t "$IMAGE_NAME" \
+  --build-arg VERSION="$VERSION" \
+  --build-arg COMMIT="$COMMIT" \
+  .
 
-# Build the executable
-go build -o "$OUTPUT" ./cmd/memos
-
-echo "Build successful!"
-echo "To run the application, execute the following command:"
-echo "$OUTPUT"
+echo "Docker build successful!"
+echo "Built image: $IMAGE_NAME"

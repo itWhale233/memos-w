@@ -18,6 +18,11 @@ RUN cd web && pnpm release
 FROM --platform=$BUILDPLATFORM golang:1.26.1-alpine AS backend
 WORKDIR /backend-build
 
+ARG GOPROXY=https://goproxy.cn,direct
+ARG GOSUMDB=sum.golang.org
+ENV GOPROXY=$GOPROXY
+ENV GOSUMDB=$GOSUMDB
+
 # Install build dependencies.
 RUN apk add --no-cache git ca-certificates
 

@@ -24,6 +24,8 @@ echo "Commit: $COMMIT"
 docker build \
   -f scripts/Dockerfile \
   -t "$IMAGE_NAME" \
+  --build-arg GOPROXY="${GOPROXY:-$(go env GOPROXY)}" \
+  --build-arg GOSUMDB="${GOSUMDB:-$(go env GOSUMDB)}" \
   --build-arg VERSION="$VERSION" \
   --build-arg COMMIT="$COMMIT" \
   .

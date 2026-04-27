@@ -18,15 +18,15 @@ RUN cd web && pnpm release
 FROM --platform=$BUILDPLATFORM golang:1.26.1-alpine AS backend
 WORKDIR /backend-build
 
-# Install build dependencies
+# Install build dependencies.
 RUN apk add --no-cache git ca-certificates
 
-# Copy go mod files and download dependencies (cached layer)
+# Copy go mod files and download dependencies (cached layer).
 COPY go.mod go.sum ./
 RUN --mount=type=cache,target=/go/pkg/mod \
     go mod download
 
-# Copy source code (use .dockerignore to exclude unnecessary files)
+# Copy source code and the prebuilt frontend assets from the frontend stage.
 COPY . .
 COPY --from=frontend /frontend-build/server/router/frontend/dist ./server/router/frontend/dist
 

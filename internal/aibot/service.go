@@ -225,21 +225,62 @@ func (s *Service) matchRuleGroupForEvent(ctx context.Context, cfg Config, memo *
 }
 
 func (s *Service) loadContext(ctx context.Context, cfg Config, memo *v1pb.Memo) ([]*v1pb.Memo, error) {
-	contextMemos := []*v1pb.Memo{memo}
+	contextMemos := make([]*v1pb.Memo, 0, cfg.MaxContextComments+2)
 	target := memo.GetName()
+	var targetMemoID int32
 	if memo.GetParent() != "" {
 		target = memo.GetParent()
-	}
-	comments, err := s.creator.ListMemoComments(ctx, &v1pb.ListMemoCommentsRequest{Name: target, PageSize: cfg.MaxContextComments})
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to load memo comments for AI assistant")
-	}
-	for _, comment := range comments.GetMemos() {
-		if comment.GetName() == memo.GetName() {
-			continue
+		parentMemoUID := strings.TrimPrefix(target, "memos/")
+		parentMemoStore, err := s.store.GetMemo(ctx, &store.FindMemo{UID: &parentMemoUID})
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to get parent memo for AI assistant context")
 		}
-		contextMemos = append(contextMemos, comment)
+		if parentMemoStore != nil {
+			targetMemoID = parentMemoStore.ID
+			parentMemo, err := s.ConvertMemoForBot(ctx, parentMemoStore)
+			if err != nil {
+				return nil, errors.Wrap(err, "failed to convert parent memo for AI assistant context")
+			}
+			contextMemos = append(contextMemos, parentMemo)
+		}
+	} else {
+		memoUID := strings.TrimPrefix(memo.GetName(), "memos/")
+		rootMemoStore, err := s.store.GetMemo(ctx, &store.FindMemo{UID: &memoUID})
+		if err == nil && rootMemoStore != nil {
+			targetMemoID = rootMemoStore.ID
+		}
+		contextMemos = append(contextMemos, memo)
 	}
+	// Always append the current incoming memo/comment after the root memo so the
+	// model can distinguish the original topic from the latest user turn.
+	contextMemos = append(contextMemos, memo)
+	if targetMemoID != 0 {
+		commentType := store.MemoRelationComment
+		limit := int(cfg.MaxContextComments)
+		commentRelations, err := s.store.ListMemoRelations(ctx, &store.FindMemoRelation{
+			RelatedMemoID: &targetMemoID,
+			Type:          &commentType,
+			Limit:         &limit,
+		})
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to load comment relations for AI assistant")
+		}
+		for _, relation := range commentRelations {
+			commentMemoStore, err := s.store.GetMemo(ctx, &store.FindMemo{ID: &relation.MemoID})
+			if err != nil || commentMemoStore == nil {
+				continue
+			}
+			commentMemo, err := s.ConvertMemoForBot(ctx, commentMemoStore)
+			if err != nil {
+				continue
+			}
+			if commentMemo.GetName() == memo.GetName() {
+				continue
+			}
+			contextMemos = append(contextMemos, commentMemo)
+		}
+	}
+	s.log(ctx, LogEntry{Level: LogLevelInfo, Stage: "context", Status: "ok", Memo: memo.GetName(), Target: target, Message: "assembled AI assistant context", Detail: map[string]any{"context_items": len(contextMemos)}})
 	return contextMemos, nil
 }
 
@@ -308,16 +349,28 @@ func (s *Service) generateReply(ctx context.Context, cfg Config, memo *v1pb.Memo
 		systemPrompt = "回答必须准确，不要编造事实；优先短答。回复要求：直接回答，不要重复问题，不要加多余前缀。"
 	}
 
+	botUsername := strings.TrimPrefix(strings.TrimSpace(cfg.BotUser), "users/")
 	var contextParts []string
 	for _, item := range contextMemos {
 		if item == nil || strings.TrimSpace(item.GetContent()) == "" {
 			continue
 		}
-		contextParts = append(contextParts, item.GetContent())
+		role := "用户评论"
+		switch {
+		case item.GetName() == memo.GetName():
+			role = "当前用户最新输入"
+		case item.GetParent() == "":
+			role = "原始 Memo"
+		case botUsername != "" && item.GetCreator() == "users/"+botUsername:
+			role = "Bot 历史回复"
+		default:
+			role = "历史评论"
+		}
+		contextParts = append(contextParts, fmt.Sprintf("[%s]\n%s", role, item.GetContent()))
 	}
 	contextText := strings.Join(contextParts, "\n\n---\n\n")
 
-	userPrompt := fmt.Sprintf("内容类型：%s\n原始内容：\n%s\n\n相关上下文：\n%s", classification, memo.GetContent(), contextText)
+	userPrompt := fmt.Sprintf("规则组：%s\n当前用户最新输入：\n%s\n\n原始 memo 与评论链上下文：\n%s", classification, memo.GetContent(), contextText)
 
 	resp, err := completion.Chat(ctx, internalai.ChatRequest{
 		Model: model,

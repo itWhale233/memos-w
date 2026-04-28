@@ -243,7 +243,7 @@ export function useDeleteMemo() {
   });
 }
 
-export function useMemoComments(name: string, options?: { enabled?: boolean; pageSize?: number }) {
+export function useMemoComments(name: string, options?: { enabled?: boolean; pageSize?: number; refetchInterval?: number | false }) {
   return useQuery({
     queryKey: [...memoKeys.comments(name), options?.pageSize ?? 0],
     queryFn: async () => {
@@ -257,5 +257,6 @@ export function useMemoComments(name: string, options?: { enabled?: boolean; pag
     },
     enabled: options?.enabled ?? true,
     staleTime: 1000 * 60, // 1 minute
+    refetchInterval: options?.refetchInterval,
   });
 }

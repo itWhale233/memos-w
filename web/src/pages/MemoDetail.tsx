@@ -18,6 +18,7 @@ import type { Attachment } from "@/types/proto/api/v1/attachment_service_pb";
 const MemoDetail = () => {
   const md = useMediaQuery("md");
   const [shareImageDialogOpen, setShareImageDialogOpen] = useState(false);
+  const [botThinking, setBotThinking] = useState(false);
   const params = useParams();
   const location = useLocation();
   const { state: locationState, hash } = location;
@@ -50,6 +51,7 @@ const MemoDetail = () => {
 
   const { data: commentsResponse } = useMemoComments(memoName, {
     enabled: !!memo,
+    refetchInterval: botThinking ? 2500 : false,
   });
   const comments = commentsResponse?.memos || [];
 
@@ -110,7 +112,7 @@ const MemoDetail = () => {
               showPinned
               onShareImageDialogOpenChange={setShareImageDialogOpen}
             />
-            <MemoCommentSection memo={displayMemo} comments={comments} parentPage={locationState?.from} />
+            <MemoCommentSection memo={displayMemo} comments={comments} parentPage={locationState?.from} botThinking={botThinking} onBotThinkingChange={setBotThinking} />
           </div>
           {md && (
             <div className="sticky top-0 left-0 shrink-0 -mt-6 w-56 h-full">

@@ -14,15 +14,16 @@ interface Props {
   memo: Memo;
   comments: Memo[];
   parentPage?: string;
+  botThinking?: boolean;
+  onBotThinkingChange?: (value: boolean) => void;
 }
 
-const MemoCommentSection = ({ memo, comments, parentPage }: Props) => {
+const MemoCommentSection = ({ memo, comments, parentPage, botThinking = false, onBotThinkingChange }: Props) => {
   const t = useTranslate();
   const currentUser = useCurrentUser();
   const { bot_user, enabled } = useAIConfig();
   const [showEditor, setShowEditor] = useState(false);
   const [replyTarget, setReplyTarget] = useState<Memo | undefined>();
-  const [botThinking, setBotThinking] = useState(false);
   const [pendingBotReplyCount, setPendingBotReplyCount] = useState<number | undefined>();
 
   const botUsername = bot_user?.replace(/^users\//, "").trim();
@@ -36,7 +37,7 @@ const MemoCommentSection = ({ memo, comments, parentPage }: Props) => {
     setReplyTarget(undefined);
     if (enabled) {
       setPendingBotReplyCount(botReplyCount);
-      setBotThinking(true);
+      onBotThinkingChange?.(true);
     }
   };
 
@@ -45,10 +46,10 @@ const MemoCommentSection = ({ memo, comments, parentPage }: Props) => {
       return;
     }
     if (pendingBotReplyCount !== undefined && botReplyCount > pendingBotReplyCount) {
-      setBotThinking(false);
+      onBotThinkingChange?.(false);
       setPendingBotReplyCount(undefined);
     }
-  }, [botThinking, botResourceName, botReplyCount, pendingBotReplyCount]);
+  }, [botThinking, botResourceName, botReplyCount, pendingBotReplyCount, onBotThinkingChange]);
 
   const replyPrefix = replyTarget ? `> ${replyTarget.content.replace(/\n/g, "\n> ")}\n\n` : undefined;
 
